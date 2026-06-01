@@ -24,7 +24,7 @@ app.add_middleware(
 )
 
 def get_active_tunnel():
-    tunnel = os.getenv("TUNNEL_URL", "https://jmqnc-119-73-100-2.run.pinggy-free.link/")
+    tunnel = os.getenv("TUNNEL_URL", "https://usfze-119-73-100-2.run.pinggy-free.link/")
     return tunnel.strip().rstrip("/")
 
 async def authenticate(

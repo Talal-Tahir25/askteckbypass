@@ -1,7 +1,8 @@
 from fastapi import FastAPI, HTTPException, Depends, Header, Query, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Optional
+from typing import Optional, List
+from pydantic import BaseModel, Field
 import httpx
 import os
 import urllib.parse
@@ -34,6 +35,73 @@ async def authenticate(
     if not key or key.strip() != API_KEY.strip():
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
     return key
+
+class LiveStatsRequest(BaseModel):
+    registrationNumbers: List[str] = Field(..., json_schema_extra={"example": ["LXK-5012"]})
+    wmc: str = Field(..., json_schema_extra={"example": "RWMC"})
+
+@app.get("/")
+async def root():
+    return {"status": "Online", "routing_target": get_active_tunnel()}
+
+@app.get("/api/trip-data")
+async def get_trip_data(
+    wmc: str = Query(...),
+    from_date: str = Query(..., alias="from"),
+    to_date: str = Query(..., alias="to"),
+    _ = Depends(authenticate)
+):
+    current_tunnel = get_active_tunnel()
+    if not current_tunnel: return []
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        try:
+            response = await client.get(
+                f"{current_tunnel}/api/trip-data",
+                params={"wmc": wmc, "from": from_date, "to": to_date, "apikey": API_KEY},
+                headers={"User-Agent": "AskTrack-Proxy/2.0", "x-api-key": API_KEY}
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception:
+            return []
+
+@app.post("/api/vehicles-live-stats")
+async def get_vehicles_live_stats(
+    req_body: LiveStatsRequest,
+    _ = Depends(authenticate)
+):
+    current_tunnel = get_active_tunnel()
+    if not current_tunnel: return []
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        try:
+            response = await client.post(
+                f"{current_tunnel}/api/vehicles-live-stats",
+                json={"registrationNumbers": req_body.registrationNumbers, "wmc": req_body.wmc},
+                headers={"User-Agent": "AskTrack-Proxy/2.0", "x-api-key": API_KEY}
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception:
+            return []
+
+@app.post("/api/asktrack/GetMultipleWMCVehiclesLiveStats")
+async def get_multiple_wmc_vehicles_live_stats(
+    req_body: LiveStatsRequest,
+    _ = Depends(authenticate)
+):
+    current_tunnel = get_active_tunnel()
+    if not current_tunnel: return {"status": "error", "data": []}
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        try:
+            response = await client.post(
+                f"{current_tunnel}/api/asktrack/GetMultipleWMCVehiclesLiveStats",
+                json={"registrationNumbers": req_body.registrationNumbers, "wmc": req_body.wmc},
+                headers={"User-Agent": "AskTrack-Proxy/2.0", "x-api-key": API_KEY}
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception:
+            return {"status": "error", "data": []}
 
 @app.get("/api/crawler/track/{tracker_id}")
 async def crawl_track_data(

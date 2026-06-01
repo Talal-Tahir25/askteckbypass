@@ -147,16 +147,16 @@ async def crawl_track_data(
     tracker_id = tracker_id.strip()
     tunnel = get_active_tunnel()
     
-    params_str = f"apikey={API_KEY}"
-    if fr: params_str += f"&fr={urllib.parse.quote(fr)}"
-    if tr: params_str += f"&tr={urllib.parse.quote(tr)}"
-    if single: params_str += f"&single={urllib.parse.quote(single)}"
+    params = {"apikey": API_KEY}
+    if fr: params["fr"] = fr
+    if tr: params["tr"] = tr
+    if single: params["single"] = single
     
-    tunnel_url = f"{tunnel}/api/crawler/track/{tracker_id}?{params_str}"
+    tunnel_url = f"{tunnel}/api/crawler/track/{tracker_id}"
     
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.get(tunnel_url)
+            response = await client.get(tunnel_url, params=params)
             response.raise_for_status()
             return response.json()
     except Exception as e:

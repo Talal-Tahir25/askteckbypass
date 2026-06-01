@@ -103,6 +103,39 @@ async def get_multiple_wmc_vehicles_live_stats(
         except Exception:
             return {"status": "error", "data": []}
 
+@app.api_route("/api/asktrack/{endpoint_name}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+async def generic_asktrack_proxy(
+    endpoint_name: str,
+    request: Request,
+    _ = Depends(authenticate)
+):
+    current_tunnel = get_active_tunnel()
+    if not current_tunnel: return {"status": "error", "message": "No tunnel active"}
+    
+    params = dict(request.query_params)
+    params["apikey"] = API_KEY
+    
+    body = None
+    if request.method in ["POST", "PUT", "PATCH"]:
+        try:
+            body = await request.json()
+        except Exception:
+            body = None
+
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        try:
+            response = await client.request(
+                method=request.method,
+                url=f"{current_tunnel}/api/asktrack/{endpoint_name}",
+                params=params,
+                json=body,
+                headers={"User-Agent": "AskTrack-Proxy/2.0", "x-api-key": API_KEY}
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
 @app.get("/api/crawler/track/{tracker_id}")
 async def crawl_track_data(
     tracker_id: str,
